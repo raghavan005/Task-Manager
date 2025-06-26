@@ -1,4 +1,4 @@
-const API_BASE = "http://0.0.0.0:10000"; 
+const API_BASE = "https://task-manager-8fgr.onrender.com"; 
 export const getAuthHeaders = () => {
   const token = localStorage.getItem("token");
   return {
