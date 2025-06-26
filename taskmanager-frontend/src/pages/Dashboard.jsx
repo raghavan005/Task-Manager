@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import ThemeToggle from '../components/ThemeToggle';
 import { jwtDecode } from 'jwt-decode';
-import Confetti from 'react-confetti'; 
+import Confetti from 'react-confetti';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { fetchTasks, createTask, updateTask, deleteTask } from '../api';
 
 
 const useWindowSize = () => {
@@ -21,7 +24,7 @@ const useWindowSize = () => {
     }
 
     window.addEventListener('resize', handleResize);
-    handleResize(); 
+    handleResize();
 
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -37,7 +40,11 @@ export default function Dashboard() {
     description: '',
     status: 'pending',
     due_date: '',
+    priority: 'medium',
   });
+  const [editingTask, setEditingTask] = useState(null); 
+  const [searchQuery, setSearchQuery] = useState(''); 
+  const [filterStatus, setFilterStatus] = useState('all'); 
 
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const profileDropdownRef = useRef(null);
@@ -45,8 +52,8 @@ export default function Dashboard() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [taskToDeleteId, setTaskToDeleteId] = useState(null);
 
-  const [showConfetti, setShowConfetti] = useState(false); 
-  const { width, height } = useWindowSize(); 
+  const [showConfetti, setShowConfetti] = useState(false);
+  const { width, height } = useWindowSize();
 
   const navigate = useNavigate();
 
@@ -67,76 +74,106 @@ export default function Dashboard() {
   }, [navigate]);
 
   useEffect(() => {
-    try {
-      const storedTasks = localStorage.getItem('tasks');
-      if (storedTasks) {
-        setTasks(JSON.parse(storedTasks));
-      }
-    } catch (error) {
-      console.error("Failed to load tasks from local storage:", error);
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('tasks', JSON.stringify(tasks));
-    } catch (error) {
-      console.error("Failed to save tasks to local storage:", error);
-    }
-  }, [tasks]);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
-        setShowProfileDropdown(false);
+    const loadTasks = async () => {
+      try {
+        const data = await fetchTasks();
+        setTasks(data);
+  
+        data.forEach(taskItem => {
+          if (taskItem.due_date && taskItem.status !== 'completed' && new Date(taskItem.due_date) < new Date()) {
+            toast.warn(`Task "${taskItem.title}" is overdue!`, {
+              position: "bottom-left",
+              autoClose: 5000,
+              hideProgressBar: false,
+              closeOnClick: true,
+              pauseOnHover: true,
+              draggable: true,
+              progress: undefined,
+              theme: "dark",
+            });
+          }
+        });
+      } catch (error) {
+        console.error("Failed to fetch tasks from server:", error);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    loadTasks();
   }, []);
+
 
   const handleChange = (e) => {
     setTask({ ...task, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!task.title.trim()) {
-      alert("Task title cannot be empty!");
+      toast.error("Task title cannot be empty!");
       return;
     }
-    const newTask = { ...task, id: Date.now() };
-    setTasks([...tasks, newTask]);
-    setTask({ title: '', description: '', status: 'pending', due_date: '' });
+
+    try {
+      if (editingTask) {
+   
+        const updatedTask = await updateTask(editingTask.id, task);
+        setTasks(tasks.map((t) => (t.id === editingTask.id ? updatedTask : t)));
+        setEditingTask(null);
+        toast.success("Task updated successfully!", { theme: "colored" });
+      } else {
+   
+        const newTask = await createTask(task);
+        setTasks([...tasks, newTask]);
+        toast.success("Task added successfully!", { theme: "colored" });
+      }
+      setTask({ title: '', description: '', status: 'pending', due_date: '', priority: 'medium' });
+    } catch (err) {
+      console.error("Failed to save task:", err);
+      toast.error("Failed to save task.");
+    }
   };
 
-  const handleStatusChange = (id) => {
-    let newStatus;
-    const updated = tasks.map((t) => {
-      if (t.id === id) {
-        if (t.status === 'pending') {
-          newStatus = 'in_progress';
-        } else if (t.status === 'in_progress') {
-          newStatus = 'completed';
-        } else {
-          newStatus = 'pending';
-        }
-
-       
-        if (newStatus === 'completed') {
-          setShowConfetti(true);
-        
-          setTimeout(() => {
-            setShowConfetti(false);
-          }, 4000); 
-        }
-        return { ...t, status: newStatus };
-      }
-      return t;
+  const handleEdit = (taskItem) => {
+    setEditingTask(taskItem);
+    setTask({
+      title: taskItem.title,
+      description: taskItem.description,
+      status: taskItem.status,
+      due_date: taskItem.due_date,
+      priority: taskItem.priority || 'medium', 
     });
-    setTasks(updated);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTask(null);
+    setTask({ title: '', description: '', status: 'pending', due_date: '', priority: 'medium' });
+  };
+
+
+  const handleStatusChange = async (id) => {
+    const taskToUpdate = tasks.find(t => t.id === id);
+    if (!taskToUpdate) return;
+
+    let newStatus;
+    if (taskToUpdate.status === 'pending') newStatus = 'in_progress';
+    else if (taskToUpdate.status === 'in_progress') newStatus = 'completed';
+    else newStatus = 'pending';
+
+    try {
+      const updatedTask = { ...taskToUpdate, status: newStatus };
+      await updateTask(id, updatedTask);
+      setTasks(tasks.map(t => (t.id === id ? updatedTask : t)));
+
+      if (newStatus === 'completed') {
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 4000);
+        toast.success("Task marked as completed!", { theme: "colored" });
+      } else {
+        toast.info(`Task status changed to ${newStatus.replace('_', ' ')}.`, { theme: "colored" });
+      }
+    } catch (err) {
+      console.error("Failed to update task status:", err);
+      toast.error("Failed to update task status.");
+    }
   };
 
   const handleDelete = (id) => {
@@ -144,10 +181,17 @@ export default function Dashboard() {
     setShowConfirmModal(true);
   };
 
-  const confirmDelete = () => {
-    setTasks(tasks.filter((t) => t.id !== taskToDeleteId));
-    setShowConfirmModal(false);
-    setTaskToDeleteId(null);
+  const confirmDelete = async () => {
+    try {
+      await deleteTask(taskToDeleteId);
+      setTasks(tasks.filter((t) => t.id !== taskToDeleteId));
+      setShowConfirmModal(false);
+      setTaskToDeleteId(null);
+      toast.error("Task deleted successfully!", { theme: "colored" });
+    } catch (err) {
+      console.error("Failed to delete task:", err);
+      toast.error("Failed to delete task.");
+    }
   };
 
   const cancelDelete = () => {
@@ -163,28 +207,47 @@ export default function Dashboard() {
     e.preventDefault();
   };
 
-  const handleDrop = (e, newStatus) => {
+  const handleDrop = async (e, newStatus) => {
     e.preventDefault();
     const taskId = parseInt(e.dataTransfer.getData("taskId"));
-    const updatedTasks = tasks.map((taskItem) => {
-      if (taskItem.id === taskId) {
-      
+    const taskToUpdate = tasks.find(taskItem => taskItem.id === taskId);
+
+    if (taskToUpdate && taskToUpdate.status !== newStatus) {
+      try {
+        const updatedTask = { ...taskToUpdate, status: newStatus };
+        await updateTask(taskId, updatedTask);
+        setTasks(tasks.map(t => (t.id === taskId ? updatedTask : t)));
+
         if (newStatus === 'completed') {
           setShowConfetti(true);
-          setTimeout(() => {
-            setShowConfetti(false);
-          }, 4000); 
+          setTimeout(() => setShowConfetti(false), 4000);
+          toast.success("Task marked as completed!", { theme: "colored" });
+        } else {
+          toast.info(`Task moved to ${newStatus.replace('_', ' ')}.`, { theme: "colored" });
         }
-        return { ...taskItem, status: newStatus };
+      } catch (err) {
+        console.error("Failed to update task status via drag and drop:", err);
+        toast.error("Failed to update task status.");
       }
-      return taskItem;
-    });
-    setTasks(updatedTasks);
+    }
   };
 
-  const filterTasksByStatus = (status) => {
-    return tasks.filter(taskItem => taskItem.status === status);
+
+  const getFilteredAndSearchedTasks = (columnStatus) => {
+    return tasks.filter(taskItem => {
+
+      const matchesColumnStatus = taskItem.status === columnStatus;
+
+     
+      const matchesSearch = taskItem.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            (taskItem.description && taskItem.description.toLowerCase().includes(searchQuery.toLowerCase()));
+
+
+      return matchesColumnStatus && matchesSearch &&
+             (filterStatus === 'all' || taskItem.status === filterStatus);
+    });
   };
+
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -247,6 +310,34 @@ export default function Dashboard() {
     exit: { opacity: 0, scale: 0.8, transition: { duration: 0.2 } },
   };
 
+  
+  const getStatusBorderClasses = (status) => {
+    switch (status) {
+      case 'pending':
+        return 'border-yellow-500 dark:border-yellow-400';
+      case 'in_progress':
+        return 'border-blue-500 dark:border-blue-400';
+      case 'completed':
+        return 'border-green-500 dark:border-green-400';
+      default:
+        return 'border-gray-300 dark:border-gray-600';
+    }
+  };
+
+  
+  const getPriorityDisplay = (priority) => {
+    switch (priority) {
+      case 'low':
+        return 'Low';
+      case 'medium':
+        return 'Medium';
+      case 'high':
+        return 'High';
+      default:
+        return 'Medium'; 
+    }
+  };
+
   return (
     <motion.div
       className="min-h-screen p-6 bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-white font-inter"
@@ -254,7 +345,8 @@ export default function Dashboard() {
       animate="visible"
       variants={containerVariants}
     >
- 
+
+      <ToastContainer position="top-right" autoClose={2000} hideProgressBar={false} newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover theme="colored" />
       {showConfetti && (
         <Confetti
           width={width}
@@ -262,10 +354,9 @@ export default function Dashboard() {
           numberOfPieces={300}
           recycle={false}
           initialVelocityY={{ min: 5, max: 20 }}
-          colors={['#FFC0CB', '#FFD700', '#ADFF2F', '#87CEEB', '#FF6347', '#EE82EE']} 
+          colors={['#FFC0CB', '#FFD700', '#ADFF2F', '#87CEEB', '#FF6347', '#EE82EE']}
         />
       )}
-
 
       <div className="absolute top-4 right-4 flex items-center gap-4 z-50">
         <ThemeToggle />
@@ -295,19 +386,17 @@ export default function Dashboard() {
                 exit="exit"
               >
                 <button
-  onClick={handleLogout}
-  className="block w-full px-4 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors duration-150 shadow-md"
->
-  Logout
-</button>
-
+                  onClick={handleLogout}
+                  className="block w-full px-4 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors duration-150 shadow-md"
+                >
+                  Logout
+                </button>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
       </div>
 
-  
       <motion.h1
         className="text-3xl font-bold mb-10 text-center"
         initial={{ y: -50, opacity: 0 }}
@@ -318,7 +407,8 @@ export default function Dashboard() {
       </motion.h1>
 
       <div className="flex flex-col md:flex-row gap-6 max-w-7xl mx-auto">
-        
+
+  
         <motion.div
           className="md:w-1/3 w-full flex flex-col items-center justify-start py-6"
           variants={itemVariants}
@@ -330,6 +420,9 @@ export default function Dashboard() {
             animate={{ x: 0, opacity: 1 }}
             transition={{ type: "spring", stiffness: 100, damping: 10, delay: 0.3 }}
           >
+            <h2 className="text-2xl font-semibold mb-4 text-center dark:text-white">
+              {editingTask ? 'Edit Task' : 'Add New Task'}
+            </h2>
             <input
               type="text"
               name="title"
@@ -356,6 +449,16 @@ export default function Dashboard() {
               <option value="in_progress">In Progress</option>
               <option value="completed">Completed</option>
             </select>
+            <select
+              name="priority"
+              value={task.priority}
+              onChange={handleChange}
+              className="w-full p-3 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="low">Low Priority</option>
+              <option value="medium">Medium Priority</option>
+              <option value="high">High Priority</option>
+            </select>
             <input
               type="date"
               name="due_date"
@@ -363,121 +466,179 @@ export default function Dashboard() {
               onChange={handleChange}
               className="w-full p-3 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-blue-500 focus:border-blue-500"
             />
-            <motion.button
-              type="submit"
-              className="w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors duration-200 shadow-md text-lg font-semibold"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              Add Task
-            </motion.button>
+            <div className="flex gap-3">
+              <motion.button
+                type="submit"
+                className="w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors duration-200 shadow-md text-lg font-semibold"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                {editingTask ? 'Update Task' : 'Add Task'}
+              </motion.button>
+              {editingTask && (
+                <motion.button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="w-full bg-gray-500 text-white p-3 rounded-lg hover:bg-gray-600 transition-colors duration-200 shadow-md text-lg font-semibold"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Cancel Edit
+                </motion.button>
+              )}
+            </div>
           </motion.form>
         </motion.div>
 
-        <div className="md:w-2/3 w-full grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {['pending', 'in_progress', 'completed'].map((statusKey) => (
-            <motion.div
-              key={statusKey}
-              className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow-inner border border-gray-200 dark:border-gray-700 min-h-[400px] flex flex-col"
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, statusKey)}
-              variants={itemVariants}
+        
+        <div className="md:w-2/3 w-full">
+        
+          <div className="mb-6 flex flex-col sm:flex-row gap-4">
+            <input
+              type="text"
+              placeholder="Search tasks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-grow p-3 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500"
+            />
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="p-3 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-blue-500 focus:border-blue-500"
             >
-              <motion.h2
-                className={`text-xl font-bold mb-4 text-center ${
-                  statusKey === 'pending' ? 'text-yellow-600 dark:text-yellow-400' :
-                  statusKey === 'in_progress' ? 'text-blue-600 dark:text-blue-400' :
-                  'text-green-600 dark:text-green-400'
-                }`}
-                initial={{ y: -20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.4 }}
-              >
-                {statusKey.replace('_', ' ').charAt(0).toUpperCase() + statusKey.replace('_', ' ').slice(1)}
-              </motion.h2>
+              <option value="all">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
 
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {['pending', 'in_progress', 'completed'].map((statusKey) => (
               <motion.div
-                className="flex-grow space-y-4 overflow-y-auto pr-2"
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
+                key={statusKey}
+                className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg shadow-inner border border-gray-200 dark:border-gray-700 min-h-[400px] flex flex-col"
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, statusKey)}
+                variants={itemVariants}
               >
-                {filterTasksByStatus(statusKey).length === 0 ? (
-                  <motion.p
-                    className="text-center text-gray-500 dark:text-gray-400"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.5 }}
-                  >
-                    {`No ${statusKey.replace('_', ' ')} tasks.`}
-                  </motion.p>
-                ) : (
-                  <AnimatePresence>
-                    {filterTasksByStatus(statusKey).map((taskItem) => (
-                      <motion.div
-                        key={taskItem.id}
-                        draggable="true"
-                        onDragStart={(e) => handleDragStart(e, taskItem.id)}
-                        className="p-4 bg-white dark:bg-gray-700 rounded-lg shadow-md border border-gray-200 dark:border-gray-600 cursor-grab active:cursor-grabbing flex flex-col justify-between"
-                        variants={taskCardVariants}
-                        initial="hidden"
-                        animate="visible"
-                        exit="exit"
-                        layout
-                      >
-                        <div>
-                          <h3 className="text-lg font-semibold mb-1 text-gray-900 dark:text-white">{taskItem.title}</h3>
-                          {taskItem.description && (
-                            <p className="text-gray-700 dark:text-gray-300 mb-2 text-sm">{taskItem.description}</p>
-                          )}
-                          <p className="text-gray-600 dark:text-gray-400 text-sm mb-1">
-                            Status: <span className={`capitalize font-medium px-2 py-0.5 rounded-full text-xs ${
-                                taskItem.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100' :
-                                taskItem.status === 'in_progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100' :
-                                'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
-                              }`}>
-                              {taskItem.status.replace('_', ' ')}
-                            </span>
-                          </p>
-                          <p className="text-gray-600 dark:text-gray-400 text-sm mb-3">
-                            Due: {taskItem.due_date ? new Date(taskItem.due_date).toLocaleDateString() : 'None'}
-                          </p>
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <motion.button
-                            onClick={() => handleStatusChange(taskItem.id)}
-                            className="bg-purple-600 text-white px-3 py-1 rounded-lg hover:bg-purple-700 transition-colors duration-200 shadow-sm flex items-center text-sm"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004 12m7-9v8h8m-1 0c-1.57-.457-3.179-.625-4.8-.57l-1-.02m1-1.424V4.776a2.002 2.002 0 00-1.414-1.414l-1.414-.707a2.002 2.002 0 00-1.414-1.414L7 0.96a2.002 2.002 0 00-1.414 1.414L4.776 3.776a2.002 2.002 0 00-1.414 1.414l-.707 1.414A2.002 2.002 0 000.96 7L.96 12a2.002 2.002 0 001.414 1.414L3.776 14.224a2.002 2.002 0 001.414 1.414l1.414.707a2.002 2.002 0 001.414 1.414L12 17.04a2.002 2.002 0 001.414-1.414L14.224 14.224a2.002 2.002 0 001.414-1.414l.707-1.414A2.002 2.002 0 0017.04 10L17.04 5a2.002 2.002 0 00-1.414-1.414L14.224 2.376a2.002 2.002 0 00-1.414-1.414L12 0.96z" />
-                            </svg>
-                            Status
-                          </motion.button>
-                          <motion.button
-                            onClick={() => handleDelete(taskItem.id)}
-                            className="bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 transition-colors duration-200 shadow-sm flex items-center text-sm"
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            Delete
-                          </motion.button>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                )}
+                <motion.h2
+                  className={`text-xl font-bold mb-4 text-center ${
+                    statusKey === 'pending' ? 'text-yellow-600 dark:text-yellow-400' :
+                      statusKey === 'in_progress' ? 'text-blue-600 dark:text-blue-400' :
+                        'text-green-600 dark:text-green-400'
+                  }`}
+                  initial={{ y: -20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                >
+                  {statusKey.replace('_', ' ').charAt(0).toUpperCase() + statusKey.replace('_', ' ').slice(1)}
+                </motion.h2>
+
+                <motion.div
+                  className="flex-grow space-y-4 overflow-y-auto pr-2"
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
+                  {getFilteredAndSearchedTasks(statusKey).length === 0 ? (
+                    <motion.p
+                      className="text-center text-gray-500 dark:text-gray-400"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.5 }}
+                    >
+                      {`No ${statusKey.replace('_', ' ')} tasks matching your criteria.`}
+                    </motion.p>
+                  ) : (
+                    <AnimatePresence>
+                      {getFilteredAndSearchedTasks(statusKey).map((taskItem) => (
+                        <motion.div
+                          key={taskItem.id}
+                          draggable="true"
+                          onDragStart={(e) => handleDragStart(e, taskItem.id)}
+                          // Apply status-based border here
+                          className={`p-4 bg-white dark:bg-gray-700 rounded-lg shadow-md border-l-4 ${getStatusBorderClasses(taskItem.status)} cursor-grab active:cursor-grabbing flex flex-col justify-between`}
+                          variants={taskCardVariants}
+                          initial="hidden"
+                          animate="visible"
+                          exit="exit"
+                          layout
+                        >
+                          <div>
+                            <h3 className="text-lg font-semibold mb-1 text-gray-900 dark:text-white">{taskItem.title}</h3>
+                            {taskItem.description && (
+                              <p className="text-gray-700 dark:text-gray-300 mb-2 text-sm">{taskItem.description}</p>
+                            )}
+                            <p className="text-gray-600 dark:text-gray-400 text-sm mb-1">
+                              Status: <span className={`capitalize font-medium px-2 py-0.5 rounded-full text-xs ${
+                                  taskItem.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100' :
+                                    taskItem.status === 'in_progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100' :
+                                      'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
+                                }`}>
+                                {taskItem.status.replace('_', ' ')}
+                              </span>
+                            </p>
+                            <p className="text-gray-600 dark:text-gray-400 text-sm mb-1">
+                              Priority: <span className={`font-medium px-2 py-0.5 rounded-full text-xs ${
+                                  taskItem.priority === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100' :
+                                    taskItem.priority === 'medium' ? 'bg-orange-100 text-orange-800 dark:bg-orange-800 dark:text-orange-100' :
+                                      'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
+                                }`}>
+                                {getPriorityDisplay(taskItem.priority)} {/* Changed here */}
+                              </span>
+                            </p>
+                            <p className="text-gray-600 dark:text-gray-400 text-sm mb-3">
+                              Due: {taskItem.due_date ? new Date(taskItem.due_date).toLocaleDateString() : 'None'}
+                            </p>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <motion.button
+                              onClick={() => handleStatusChange(taskItem.id)}
+                              className="bg-purple-600 text-white px-3 py-1 rounded-lg hover:bg-purple-700 transition-colors duration-200 shadow-sm flex items-center text-sm"
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004 12m7-9v8h8m-1 0c-1.57-.457-3.179-.625-4.8-.57l-1-.02m1-1.424V4.776a2.002 2.002 0 00-1.414-1.414l-1.414-.707a2.002 2.002 0 00-1.414-1.414L7 0.96a2.002 2.002 0 00-1.414 1.414L4.776 3.776a2.002 2.002 0 00-1.414 1.414l-.707 1.414A2.002 2.002 0 000.96 7L.96 12a2.002 2.002 0 001.414 1.414L3.776 14.224a2.002 2.002 0 001.414 1.414l1.414.707a2.002 2.002 0 001.414 1.414L12 17.04a2.002 2.002 0 001.414-1.414L14.224 14.224a2.002 2.002 0 001.414-1.414l.707-1.414A2.002 2.002 0 0017.04 10L17.04 5a2.002 2.002 0 00-1.414-1.414L14.224 2.376a2.002 2.002 0 00-1.414-1.414L12 0.96z" />
+                              </svg>
+                              Status
+                            </motion.button>
+                            <motion.button
+                              onClick={() => handleEdit(taskItem)}
+                              className="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 transition-colors duration-200 shadow-sm flex items-center text-sm"
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                              Edit
+                            </motion.button>
+                            <motion.button
+                              onClick={() => handleDelete(taskItem.id)}
+                              className="bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 transition-colors duration-200 shadow-sm flex items-center text-sm"
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Delete
+                            </motion.button>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  )}
+                </motion.div>
               </motion.div>
-            </motion.div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 
-
+   
       <AnimatePresence>
         {showConfirmModal && (
           <motion.div
