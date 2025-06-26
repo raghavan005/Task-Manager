@@ -61,7 +61,7 @@ The frontend provides the user interface for interacting with the Task Manager.
 
 1.  Navigate to the `frontend` directory:
     ```bash
-    cd frontend
+    cd taskmanager-frontend
     ```
 2.  Install the necessary Node.js packages:
     ```bash
@@ -111,12 +111,4 @@ The application has been validated against the following key functionalities:
 
 ---
 
-## 📦 Future Improvements
 
-We have several exciting enhancements planned for the Task Manager:
-
-* **Token Refresh System**: Implement a mechanism to refresh JWTs seamlessly, improving user experience.
-* **Search & Filter**: Add advanced search and filtering capabilities for tasks.
-* **Comprehensive Testing**: Integrate `pytest` for backend testing and `React Testing Library` for frontend testing to ensure robust code quality.
-* **Deployment Automation**: Prepare for live deployment on platforms like Render or Vercel.
-* **Responsive PWA Support**: Enhance the application with Progressive Web App (PWA) features for a better mobile experience.
