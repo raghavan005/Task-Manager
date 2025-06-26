@@ -61,7 +61,7 @@ The frontend provides the user interface for interacting with the Task Manager.
 
 1.  Navigate to the `frontend` directory:
     ```bash
-    cd frontend
+    cd taskmanager-frontend
     ```
 2.  Install the necessary Node.js packages:
     ```bash
