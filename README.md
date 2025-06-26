@@ -1,105 +1,122 @@
-# 📝 Task Manager
+# 📝 Task Manager: A Secure Full-Stack Web Application
 
-A full-stack web application built with **FastAPI** (Python) and **React**, allowing users to register, log in, and manage their personal tasks securely with JWT-based authentication.
+## Overview
+
+Task Manager is a robust full-stack web application that empowers users to securely manage their personal tasks. Built with **FastAPI** (Python) for the backend and **React** for the frontend, it leverages **JWT-based authentication** to ensure that all user data and operations are protected and private.
 
 ---
 
-## 📌 Features
+## ✨ Features
 
-- 🔐 **JWT Authentication** (Login/Register)
-- 🧾 **Per-user Task Management**
-- ⚙️ **Task CRUD**: Create, Read, Update, Delete
-- 📊 **Task Insights**: Visual summary with Pie Chart
-- ✅ **Protected Routes** using FastAPI's `Depends`
-- 🚫 **Auto Logout on Token Expiry**
+* 🔐 **Secure User Authentication**: Seamless user registration and login powered by **JSON Web Tokens (JWT)**.
+* 🧾 **Personalized Task Management**: Each user has a dedicated space to manage their tasks, ensuring data privacy.
+* ⚙️ **Complete Task CRUD**: Easily **C**reate, **R**ead, **U**pdate, and **D**elete your tasks.
+* 📊 **Task Insights**: Gain a quick visual summary of your tasks with an interactive **Pie Chart**.
+* ✅ **Protected Routes**: FastAPI's `Depends` system ensures that only authenticated users can access sensitive task management endpoints.
+* 🚫 **Automatic Logout**: Users are automatically logged out when their JWT token expires, enhancing security.
+* 🚀 **Clean Architecture**: A clear and efficient separation between frontend and backend concerns.
 
 ---
 
 ## 🚀 Getting Started
 
+Follow these steps to get the Task Manager application up and running on your local machine.
+
 ### 🔧 Backend Setup (FastAPI)
 
-1. Navigate to the backend folder:
-   ```bash
-   cd backend
-Create a virtual environment:
+The backend handles all API requests, authentication, and database interactions.
 
-bash
-Copy
-Edit
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-Install dependencies:
+1.  Navigate to the `backend` directory:
+    ```bash
+    cd backend
+    ```
+2.  Create a Python virtual environment to manage dependencies:
+    ```bash
+    python -m venv venv
+    ```
+3.  Activate the virtual environment:
+    * **On macOS/Linux:**
+        ```bash
+        source venv/bin/activate
+        ```
+    * **On Windows:**
+        ```bash
+        .\venv\Scripts\activate
+        ```
+4.  Install the required Python packages:
+    ```bash
+    pip install -r requirements.txt
+    ```
+5.  Start the FastAPI development server:
+    ```bash
+    uvicorn main:app --reload
+    ```
+    The backend API will be accessible at: [http://localhost:8000](http://localhost:8000)
 
-bash
-Copy
-Edit
-pip install -r requirements.txt
-Start the FastAPI server:
+---
 
-bash
-Copy
-Edit
-uvicorn main:app --reload
-Backend runs at: http://localhost:8000
+### 💻 Frontend Setup (React)
 
-💻 Frontend Setup (React)
-Navigate to the frontend folder:
+The frontend provides the user interface for interacting with the Task Manager.
 
-bash
-Copy
-Edit
-cd frontend
-Install packages:
+1.  Navigate to the `frontend` directory:
+    ```bash
+    cd frontend
+    ```
+2.  Install the necessary Node.js packages:
+    ```bash
+    npm install
+    ```
+3.  Start the React development server:
+    ```bash
+    npm run dev
+    ```
+    The frontend application will be available at: [http://localhost:5173](http://localhost:5173)
 
-bash
-Copy
-Edit
-npm install
-Start the React development server:
+---
 
-bash
-Copy
-Edit
-npm run dev
-Frontend runs at: http://localhost:5173
+## 🔐 API Endpoints
 
-🔐 API Endpoints
-✅ Auth
-Method	Endpoint	Description
-POST	/register	Create a new user
-POST	/login	Login and get JWT
+### Auth Endpoints
 
-📋 Task (JWT Required)
-Method	Endpoint	Description
-GET	/tasks/	Get tasks for user
-POST	/tasks/	Create a new task
-PUT	/tasks/{id}/	Update a task
-DELETE	/tasks/{id}/	Delete a task
+| Method | Endpoint    | Description               |
+| :----- | :---------- | :------------------------ |
+| `POST` | `/register` | Create a new user account |
+| `POST` | `/login`    | Log in and receive a JWT  |
 
-🧪 Functional Validation
-✅ User registration & login
+### Task Endpoints (JWT Required)
 
-✅ JWT-based auth with expiry
+These endpoints require a valid JWT in the `Authorization` header.
 
-✅ Tasks are user-specific
+| Method   | Endpoint        | Description                |
+| :------- | :-------------- | :------------------------- |
+| `GET`    | `/tasks/`       | Retrieve all tasks for the authenticated user |
+| `POST`   | `/tasks/`       | Create a new task          |
+| `PUT`    | `/tasks/{id}/`  | Update an existing task by its ID |
+| `DELETE` | `/tasks/{id}/`  | Delete a task by its ID    |
 
-✅ CRUD operations work per user
+---
 
-✅ Token errors auto-redirect to login
+## ✅ Functional Validation
 
-✅ Clean separation of frontend/backend
+The application has been validated against the following key functionalities:
 
-✅ Insights via Pie Chart dropdown
+* **User Authentication**: Robust user registration and login mechanisms.
+* **JWT-based Security**: Secure authentication with token expiry handling.
+* **User-Specific Tasks**: Tasks are strictly segregated and accessible only by their respective owners.
+* **Comprehensive CRUD**: All Create, Read, Update, and Delete operations for tasks are fully functional.
+* **Token Expiry Handling**: Automatic redirection to the login page upon token expiration.
+* **Architectural Clarity**: A clean and well-defined separation between frontend and backend logic.
+* **Visual Insights**: Task summaries are effectively presented via a Pie Chart dropdown.
 
-📦 Future Improvements
-🔁 Token Refresh system
+---
 
-🔍 Search & filter tasks
+## 📦 Future Improvements
 
-🧪 Add tests using pytest / React Testing Library
+We have several exciting enhancements planned for the Task Manager:
 
-🌍 Deploy via Render / Vercel
-
-📱 Responsive PWA support
-
+* **Token Refresh System**: Implement a mechanism to refresh JWTs seamlessly, improving user experience.
+* **Search & Filter**: Add advanced search and filtering capabilities for tasks.
+* **Comprehensive Testing**: Integrate `pytest` for backend testing and `React Testing Library` for frontend testing to ensure robust code quality.
+* **Deployment Automation**: Prepare for live deployment on platforms like Render or Vercel.
+* **Responsive PWA Support**: Enhance the application with Progressive Web App (PWA) features for a better mobile experience.
