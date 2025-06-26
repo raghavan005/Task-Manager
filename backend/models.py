@@ -10,7 +10,7 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     password = Column(String)
 
-    # One-to-many relationship: A user can have many tasks
+
     tasks = relationship("Task", back_populates="owner")
 
 

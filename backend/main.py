@@ -11,7 +11,6 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# CORS settings for frontend
 app.add_middleware(
    CORSMiddleware,
    allow_origins=["http://localhost:5173"],
@@ -20,7 +19,7 @@ app.add_middleware(
    allow_headers=["*"],
 )
 
-# Dependency for getting DB
+
 def get_db():
     db = SessionLocal()
     try:
@@ -28,7 +27,6 @@ def get_db():
     finally:
         db.close()
 
-# Register route
 @app.post("/register")
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.username == user.username).first()
@@ -42,7 +40,7 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
     return {"message": "User registered successfully"}
 
-# Login route
+
 @app.post("/login", response_model=schemas.Token)
 def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.username == user.username).first()

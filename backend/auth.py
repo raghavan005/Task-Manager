@@ -8,19 +8,19 @@ from models import User
 from database import SessionLocal
 
 
-# Constants
+
 SECRET_KEY = "your-super-secret-key"  
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-# Password hashing context
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# OAuth2 schema
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 
-# Utils
+
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
@@ -35,7 +35,6 @@ def create_access_token(data: dict) -> str:
     return encoded_jwt
 
 
-# Database session dependency
 def get_db():
     db = SessionLocal()
     try:
@@ -44,7 +43,7 @@ def get_db():
         db.close()
 
 
-# ✅ This function is what was missing
+
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
