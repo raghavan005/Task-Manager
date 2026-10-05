@@ -49,7 +49,7 @@ The backend handles all API requests, authentication, and database interactions.
     ```
 5.  Start the FastAPI development server:
     ```bash
-    uvicorn main:app --reload
+    unicorn main:app --reload
     ```
     The backend API will be accessible at: [http://localhost:8000](http://localhost:8000)
 
@@ -59,7 +59,7 @@ The backend handles all API requests, authentication, and database interactions.
 
 The frontend provides the user interface for interacting with the Task Manager.
 
-1.  Navigate to the `frontend` directory:
+1.  Navigate to the `taskmanager-frontend` directory:
     ```bash
     cd taskmanager-frontend
     ```
@@ -92,8 +92,8 @@ These endpoints require a valid JWT in the `Authorization` header.
 | :------- | :-------------- | :------------------------- |
 | `GET`    | `/tasks/`       | Retrieve all tasks for the authenticated user |
 | `POST`   | `/tasks/`       | Create a new task          |
-| `PUT`    | `/tasks/{id}/`  | Update an existing task by its ID |
-| `DELETE` | `/tasks/{id}/`  | Delete a task by its ID    |
+| `PUT`    | `/tasks/{id}`   | Update an existing task by its ID |
+| `DELETE` | `/tasks/{id}`   | Delete a task by its ID    |
 
 ---
 
